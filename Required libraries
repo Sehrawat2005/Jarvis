@@ -1,0 +1,11 @@
+- pyttsx3: For text-to-speech conversion
+- speech_recognition: For capturing and converting voice to text
+- wikipedia: To fetch summarized information from Wikipedia
+- requests: For API calls to Gemini model
+- psutil: For accessing system-level information and process handling
+- subprocess & os: For executing and managing applications
+- datetime & time: For handling current time and timestamps
+- json: For saving and loading command history
+- platform: For fetching OS details
+- smtplib: Email sending capabilities (future extension)
+- webbrowser: To open websites in the browser
