@@ -1,0 +1,13 @@
+- speak(audio): Converts text into speech output using pyttsx3.
+- wishMe(): Greets the user depending on the time of day.
+- takeCommand(): Captures microphone input, converts it to text using Google Speech Recognition.
+- save_to_history(command, action): Logs each command and response into command_history.json with timestamps.
+- confirm_and_execute(prompt, cmd, spoken_action): Asks for confirmation (yes/no) before executing critical system commands.
+- system_shutdown(): Triggers system shutdown with confirmation.
+- system_reboot(): Triggers system restart with confirmation.
+- open_app(app_name): Opens a predefined application or web link based on a dictionary of paths.
+- close_app(app_name): Closes a running application using taskkill command.
+- open_folder(folder_name): Opens common system folders like Documents, Downloads, Desktop.
+- gemini_answer(question): Fetches an answer from Google Gemini API for general queries.
+- execute_command(query): Main logic – decides whether to open/close apps, folders, execute system commands, or fallback to Gemini.
+- main(): Entry point – initializes assistant, greets user, listens continuously, and executes commands.
