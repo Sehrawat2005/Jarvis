@@ -1,0 +1,311 @@
+# Offline Jarvis Assistant - Part 1: Core Voice Assistant with App & Folder Control (+ Shutdown/Reboot + Gemini)
+
+import pyttsx3
+import speech_recognition as sr
+import datetime
+import wikipedia
+import webbrowser
+import os
+import smtplib
+import subprocess
+import psutil
+import platform
+import json
+import time
+import requests
+
+engine = pyttsx3.init('sapi5')
+voices = engine.getProperty('voices')
+engine.setProperty('voice', voices[0].id)
+
+HISTORY_FILE = "command_history.json"
+
+# === Gemini Config (optional) ===
+USE_GEMINI = True  # set False to disable online answers
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR API KEY HERE")
+GEMINI_MODEL = "gemini-1.5-flash"  # you can change to gemini-1.5-pro if available for your key
+
+# === SPEAK FUNCTION ===
+def speak(audio):
+    print(f"Jarvis: {audio}")
+    engine.say(audio)
+    engine.runAndWait()
+
+# === INITIAL GREETING ===
+def wishMe():
+    hour = int(datetime.datetime.now().hour)
+    if hour >= 0 and hour < 12:
+        speak("Good Morning!")
+    elif hour >= 12 and hour < 18:
+        speak("Good Afternoon!")
+    else:
+        speak("Good Evening!")
+    speak("I am Jarvis. Tell me how may I help you.")
+
+# === VOICE RECOGNITION ===
+def takeCommand():
+    r = sr.Recognizer()
+    with sr.Microphone() as source:
+        print("Listening...")
+        r.pause_threshold = 1
+        audio = r.listen(source)
+    try:
+        print("Recognizing...")
+        query = r.recognize_google(audio, language='en-in')
+        print(f"User said: {query}\n")
+    except Exception:
+        print("Say that again please...")
+        return "None"
+    return query.lower()
+
+# === COMMAND HISTORY LOGGER ===
+def save_to_history(command, action):
+    entry = {
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "command": command,
+        "action": action
+    }
+    try:
+        history = []
+        if os.path.exists(HISTORY_FILE):
+            with open(HISTORY_FILE, 'r') as file:
+                history = json.load(file)
+        history.append(entry)
+        with open(HISTORY_FILE, 'w') as file:
+            json.dump(history, file, indent=4)
+    except Exception as e:
+        print("Error saving history:", e)
+
+# === SYSTEM POWER ACTIONS ===
+def confirm_and_execute(prompt, cmd, spoken_action):
+    """Ask for a quick yes/no voice confirmation before running power commands."""
+    speak(prompt + " Say 'yes' to confirm.")
+    ans = takeCommand()
+    if ans and ("yes" in ans or "confirm" in ans):
+        try:
+            speak(spoken_action)
+            os.system(cmd)
+            save_to_history(spoken_action, cmd)
+        except Exception as e:
+            speak("I couldn't complete the action.")
+            print(e)
+    else:
+        speak("Cancelled.")
+
+def system_shutdown():
+    # Immediate shutdown
+    confirm_and_execute("Do you want to shut down the PC?", "shutdown /s /t 0", "Shutting down now.")
+
+def system_reboot():
+    # Immediate reboot
+    confirm_and_execute("Do you want to restart the PC?", "shutdown /r /t 0", "Restarting now.")
+
+# === OPEN SYSTEM APP ===
+def open_app(app_name):
+    paths = {
+        "chrome": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        "vscode": os.path.expandvars("%LOCALAPPDATA%\\Programs\\Microsoft VS Code\\Code.exe"),
+        "notepad": "notepad.exe",
+        "calculator": "calc.exe",
+        "command prompt": "cmd.exe",
+        "paint": "mspaint.exe",
+        "copilot": "C:\\Users\\%USERNAME%\\AppData\\Local\\Programs\\Microsoft Copilot\\Copilot.exe",
+        "spotify": "C:\\Users\\%USERNAME%\\AppData\\Roaming\\Spotify\\Spotify.exe",
+        "brave": "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
+        "telegram": "C:\\Users\\%USERNAME%\\AppData\\Roaming\\Telegram Desktop\\Telegram.exe",
+        "canva": "C:\\Users\\%USERNAME%\\AppData\\Local\\Programs\\Canva\\Canva.exe",
+        "microsoft edge": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+        "chat gpt": "C:\\Users\\%USERNAME%\\AppData\\Local\\Programs\\ChatGPT\\ChatGPT.exe",
+        "outlook": "C:\\Program Files\\Microsoft Office\\root\\Office16\\OUTLOOK.EXE",
+        "photos": "ms-photos:",
+        "whatsapp": "C:\\Users\\%USERNAME%\\AppData\\Local\\WhatsApp\\WhatsApp.exe",
+        "instagram": "https://www.instagram.com",
+        "microsoft teams": "C:\\Users\\%USERNAME%\\AppData\\Local\\Microsoft\\Teams\\current\\Teams.exe",
+        "weather": "bingweather:",
+        "zoom workplace": "C:\\Users\\%USERNAME%\\AppData\\Roaming\\Zoom\\bin\\Zoom.exe",
+        "maps": "bingmaps:",
+        "camera": "microsoft.windows.camera:",
+        "linkedin": "https://www.linkedin.com",
+        "codeblocks": "C:\\Program Files\\CodeBlocks\\codeblocks.exe"
+    }
+    if app_name in paths:
+        try:
+            target = os.path.expandvars(paths[app_name])
+            if target.startswith("http") or ":" in target:
+                os.startfile(target)
+            else:
+                subprocess.Popen(target, shell=True)
+            speak(f"Opening {app_name}")
+            save_to_history(f"open {app_name}", target)
+        except:
+            speak(f"Failed to open {app_name}.")
+    else:
+        speak(f"Path for {app_name} not found.")
+
+# === CLOSE SYSTEM APP ===
+def close_app(app_name):
+    task_map = {
+        "chrome": "chrome.exe",
+        "camera": "Camera.exe",
+        "maps": "Maps.exe",
+        "weather": "Weather.exe",
+        "instagram": "Instagram.exe",
+        "vscode": "Code.exe",
+        "notepad": "notepad.exe",
+        "calculator": "Calculator.exe",
+        "command prompt": "cmd.exe",
+        "paint": "mspaint.exe",
+        "copilot": "Copilot.exe",
+        "spotify": "Spotify.exe",
+        "brave": "brave.exe",
+        "telegram": "Telegram.exe",
+        "canva": "Canva.exe",
+        "microsoft edge": "msedge.exe",
+        "chat gpt": "ChatGPT.exe",
+        "outlook": "OUTLOOK.EXE",
+        "photos": "Microsoft.Photos.exe",
+        "whatsapp": "WhatsApp.exe",
+        "microsoft teams": "Teams.exe",
+        "zoom workplace": "Zoom.exe",
+        "codeblocks": "codeblocks.exe"
+    }
+    if app_name in task_map:
+        try:
+            os.system(f"taskkill /f /im {task_map[app_name]}")
+            speak(f"Closed {app_name}")
+            save_to_history(f"close {app_name}", task_map[app_name])
+        except:
+            speak(f"Could not close {app_name}.")
+    else:
+        speak(f"I couldn't find the process for {app_name}.")
+
+# === OPEN FOLDER ===
+def open_folder(folder_name):
+    folder_map = {
+        "downloads": os.path.join(os.path.expanduser("~"), "Downloads"),
+        "documents": os.path.join(os.path.expanduser("~"), "Documents"),
+        "pictures": os.path.join(os.path.expanduser("~"), "Pictures"),
+        "desktop": os.path.join(os.path.expanduser("~"), "Desktop")
+    }
+    if folder_name in folder_map:
+        try:
+            os.startfile(folder_map[folder_name])
+            speak(f"Opening {folder_name} folder")
+            save_to_history(f"open {folder_name} folder", folder_map[folder_name])
+        except:
+            speak(f"Unable to open {folder_name} folder")
+    else:
+        speak(f"I don't recognize that folder")
+
+# === GEMINI ONLINE ANSWERS ===
+def gemini_answer(question: str) -> str:
+    """Ask Google Gemini for a concise answer. Returns plain text or empty string on failure."""
+    if not USE_GEMINI:
+        return ""
+    if not GEMINI_API_KEY or GEMINI_API_KEY == "Gemini- AIzaSyCdMv36tcXB55eUlsTPKnBgvbl9BgfyUfo":
+        print("[Gemini] Missing API key. Set GEMINI_API_KEY env var or in code.")
+        return ""
+
+    url = f"https://generativelanguage.googleapis.com/v1/models/{GEMINI_MODEL}:generateContent"
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": (
+                        "Answer the user's question clearly and briefly. "
+                        "If it looks like a system command request, suggest a Windows command." 
+                        f"\nQuestion: {question}"
+                    )}
+                ]
+            }
+        ]
+    }
+    try:
+        resp = requests.post(f"{url}?key={GEMINI_API_KEY}", headers=headers, json=payload, timeout=20)
+        data = resp.json()
+        if "candidates" not in data:
+            print("[Gemini] Error:", data)
+            return ""
+        text = data["candidates"][0]["content"]["parts"][0].get("text", "").strip()
+        return text
+    except Exception as e:
+        print("[Gemini] Exception:", e)
+        return ""
+
+# === EXECUTE COMMANDS ===
+def execute_command(query):
+    if 'open' in query:
+        for app in [
+            "chrome", "vscode", "notepad", "calculator", "command prompt", "paint", "copilot",
+            "spotify", "brave", "telegram", "canva", "microsoft edge", "chat gpt", "outlook",
+            "photos", "whatsapp", "instagram", "microsoft teams", "weather", "zoom workplace",
+            "maps", "camera", "linkedin", "codeblocks"
+        ]:
+            if app in query:
+                open_app(app)
+                return
+        for folder in ["downloads", "documents", "pictures", "desktop"]:
+            if folder in query:
+                open_folder(folder)
+                return
+        speak("I can open common apps and folders. Please try again with a known one.")
+        return
+
+    elif 'close' in query:
+        for app in [
+            "chrome", "vscode", "notepad", "calculator", "command prompt", "paint", "copilot",
+            "spotify", "brave", "telegram", "canva", "microsoft edge", "chat gpt", "outlook",
+            "photos", "whatsapp", "instagram", "microsoft teams", "weather", "zoom workplace",
+            "maps", "camera", "linkedin", "codeblocks"
+        ]:
+            if app in query:
+                close_app(app)
+                return
+        speak("I can close known apps. Try again with a supported name.")
+        return
+
+    # === POWER COMMANDS ===
+    if 'shutdown' in query or 'power off' in query:
+        system_shutdown()
+        return
+    if 'restart' in query or 'reboot' in query:
+        system_reboot()
+        return
+
+    elif 'time' in query:
+        strTime = datetime.datetime.now().strftime("%H:%M:%S")
+        speak(f"Sir, the time is {strTime}")
+        save_to_history("check time", strTime)
+        return
+
+    elif 'exit' in query or 'stop' in query:
+        speak("Goodbye! Shutting down.")
+        exit()
+
+    # === FALLBACK TO GEMINI FOR QUESTIONS ===
+    if any(k in query for k in ["what is", "who is", "search", "how to", "meaning", "tell me about", "define"]):
+        answer = gemini_answer(query)
+        if answer:
+            speak(answer)
+            save_to_history("gemini answer", answer)
+            return
+
+    # If nothing matched, try Gemini as a general fallback
+    answer = gemini_answer(query)
+    if answer:
+        speak(answer)
+        save_to_history("gemini answer", answer)
+    else:
+        speak("Sorry, I didn't understand that command.")
+
+# === MAIN FUNCTION ===
+def main():
+    wishMe()
+    while True:
+        query = takeCommand()
+        if query != "None":
+            execute_command(query)
+
+if __name__ == "__main__":
+    main()
