@@ -1,0 +1,8 @@
+1. Jarvis initializes TTS engine and loads Gemini configuration.
+2. Greets the user depending on the current time.
+3. Listens for commands via microphone.
+4. Processes the command to determine intent.
+5. Executes the corresponding function (open app, close app, shutdown, etc.).
+6. Logs the command into command_history.json.
+7. Provides response through speech.
+8. Repeats the loop until user exits.
