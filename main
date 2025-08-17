@@ -202,7 +202,7 @@ def gemini_answer(question: str) -> str:
     """Ask Google Gemini for a concise answer. Returns plain text or empty string on failure."""
     if not USE_GEMINI:
         return ""
-    if not GEMINI_API_KEY or GEMINI_API_KEY == "Gemini- AIzaSyCdMv36tcXB55eUlsTPKnBgvbl9BgfyUfo":
+    if not GEMINI_API_KEY or GEMINI_API_KEY == "Gemini- YOUR API KEY HERE":
         print("[Gemini] Missing API key. Set GEMINI_API_KEY env var or in code.")
         return ""
 
